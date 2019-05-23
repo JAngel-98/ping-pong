@@ -15,9 +15,17 @@ Adafruit_GFX_Button left, right;
 
 int pixel_x, pixel_y;     //Touch_getXY() updates global vars
 int16_t block;
-uint16_t ID, x, y, xB, yB, yButton;
-int8_t cX = 1, cY = -1;
+uint16_t ID, x, y;       //Coordenadas barra
+uint16_t xB, yB;         //Coordenadas pelota
+uint16_t yButton;        //Cordenadas botones
+int8_t cX = 1, cY = -1;  //Avance pelota
 uint8_t Orientation = 0;
+
+int bricks[5][12];
+
+int colors[] = {0x001f, 0xf800, 0x07e0, 0x780f, 0xffe0, 0xfd20};
+
+bool playGame = false;
 
 // Assign human-readable names to some common 16-bit color values:
 #define	BLACK   	0x0000
@@ -40,6 +48,17 @@ uint8_t Orientation = 0;
 #define GreenYellow 0xAFE5 
 #define Pink        0xF81F
 
+void restartBricks() {
+  randomSeed(analogRead(13));
+  for(int j = 0; j < 5; j++) {
+    for(int i = 0; i < 12; i++) {
+      bricks[j][i] = 1;
+      tft.fillRect(i * 20, j * 20, 20, 20, colors[random(0, 6)]);
+      tft.drawRect(i * 20, j * 20, 20, 20, WHITE);
+    }
+  }
+}
+
 bool Touch_getXY(void) {
   TSPoint p = ts.getPoint();
   pinMode(YP, OUTPUT);      //restore shared pins
@@ -55,9 +74,6 @@ bool Touch_getXY(void) {
 }
 
 void setup(void) {
-  pinMode(12, INPUT);
-  pinMode(13, INPUT);
-  
   tft.reset();
   ID = tft.readID();
   tft.begin(ID);
@@ -81,36 +97,73 @@ void setup(void) {
   right.drawButton(false);
   
   tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
-  tft.drawCircle(xB, yB, 9, GREEN);
+  tft.fillCircle(xB, yB, 9, WHITE);
+  tft.drawCircle(xB, yB, 9, DarkGrey);
+  
+  restartBricks();
 }
 
 void loop() {
-  bool down = Touch_getXY();
-  left.press(down && left.contains(pixel_x, pixel_y));
-  right.press(down && right.contains(pixel_x, pixel_y));
-  if((right.justPressed()) && x < tft.width() - block * 2) {
-    tft.fillRect(x, y, 2, 10, BLACK);
-    x++;
-    tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
+  if(!playGame) {
+    bool down = Touch_getXY();
+    left.press(down && left.contains(pixel_x, pixel_y));
+    right.press(down && right.contains(pixel_x, pixel_y));
+    if(right.justPressed() || left.justPressed())
+      playGame = true;
   }
-  if((left.justPressed()) && x > 0) {
-    tft.fillRect(x + block * 2 - 2, y, 2, 10, BLACK);
-    x--;
-    tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
-  }
-  tft.drawCircle(xB, yB, 9, BLACK);
-  xB = xB + cX;
-  yB = yB + cY;
-  //Serial.print("xB: ");
-  //Serial.print(xB);
-  //Serial.print("\tyB: ");
-  //Serial.println(yB);
-  tft.fillCircle(xB, yB, 8, BLACK);
-  tft.drawCircle(xB, yB, 9, GREEN);
-  if(xB == 240 - 10 || xB == 10) {
-    cX = -cX;
-  }
-  if(yB == y - 10 || yB == 10) {
-    cY = -cY;
+  while(playGame) {
+    bool down = Touch_getXY();
+    left.press(down && left.contains(pixel_x, pixel_y));
+    right.press(down && right.contains(pixel_x, pixel_y));
+    if(right.justPressed() && x < tft.width() - block * 2) {
+      tft.fillRect(x, y, 8, 10, BLACK);
+      x += 4;
+      tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
+    }
+    if(left.justPressed() && x > 0) {
+      tft.fillRect(x + block * 2 - 8, y, 8, 10, BLACK);
+      x -= 4;
+      tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
+    }
+    tft.fillCircle(xB, yB, 9, BLACK);
+    xB = xB + cX;
+    yB = yB + cY;
+    tft.fillCircle(xB, yB, 9, WHITE);
+    tft.drawCircle(xB, yB, 9, DarkGrey);
+    if(xB == 240 - 10 || xB == 10)
+      cX = -cX;
+    if(yB == y - 10 || yB == 10)
+      cY = -cY;
+    if(yB < 111 && yB != 10) {
+      if((yB - 10) % 20 == 0) {
+        if(cY >= 0 && bricks[(int) ((yB + 10 - 20) / 20)][(int) (xB / 20)] == 1) {
+          tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20 - 20, 20, 20, CYAN);
+          cY = -cY;
+        }
+        if(cY < 0 && bricks[(int) ((yB - 10 - 20) / 20)][(int) (xB / 20)] == 1) {
+          tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20 - 20, 20, 20, CYAN);
+          cY = -cY;
+        }
+      }
+      if((xB - 10) % 20 == 0) {
+        //
+      }
+    }
+    /*if(yB % 20 == 0 && (int) ((yB - 10) / 20) && bricks[(int) ((yB + 10) / 20)][(int) (xB / 20)] == 1) {
+      tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20, 20, 20, RED);
+      cY = -cY;
+    }
+    if(yB % 20 == 0 && (int) ((yB - 10) / 20) && bricks[(int) ((yB - 10) / 20)][(int) (xB / 20)] == 1) {
+      tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20, 20, 20, RED);
+      cY = -cY;
+    }
+    if(xB % 20 == 0 && (int) ((yB - 10) / 20) && bricks[(int) ((yB + 10) / 20)][(int) (xB / 20)] == 1) {
+      tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20, 20, 20, RED);
+      cX = -cX;
+    }
+    if(xB % 20 == 0 && (int) ((yB - 10) / 20) && bricks[(int) ((yB - 10) / 20)][(int) (xB / 20)] == 1) {
+      tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20, 20, 20, RED);
+      cX = -cX;
+    }*/
   }
 }
