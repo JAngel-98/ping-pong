@@ -88,12 +88,12 @@ void loop() {
   bool down = Touch_getXY();
   left.press(down && left.contains(pixel_x, pixel_y));
   right.press(down && right.contains(pixel_x, pixel_y));
-  if((digitalRead(13) == HIGH || right.justPressed()) && x < tft.width() - block * 2) {
+  if((right.justPressed()) && x < tft.width() - block * 2) {
     tft.fillRect(x, y, 2, 10, BLACK);
     x++;
     tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
   }
-  if((digitalRead(12) == HIGH || left.justPressed()) && x > 0) {
+  if((left.justPressed()) && x > 0) {
     tft.fillRect(x + block * 2 - 2, y, 2, 10, BLACK);
     x--;
     tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);

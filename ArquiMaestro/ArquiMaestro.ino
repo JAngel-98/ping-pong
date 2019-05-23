@@ -39,7 +39,8 @@ void setup(void) {
   tft.setRotation(0);
   tft.fillScreen(BLACK);
   
-  Serie2.begin(9600);
+  Serie2.begin(9600);  
+  Serial.begin(9600);
 
   block = tft.width() / 6;
   tft.fillScreen(BLACK);
@@ -75,6 +76,7 @@ void loop() {
     x--;
     tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
   }
+  Serial.println("pressed");
   if(ball) {
     tft.drawCircle(xB, yB, 9, BLACK);
     tft.drawLine(xB - 5, 0, xB + 5, 0, BLACK);
