@@ -9,16 +9,16 @@
 const int XP = 8, XM = A2, YP = A3, YM = 9; //ID=0x9341
 const int TS_LEFT = 117, TS_RT = 897, TS_TOP = 76, TS_BOT = 886;
 
-MCUFRIEND_kbv tft;       // hard-wired for UNO shields anyway.
+MCUFRIEND_kbv tft;        // hard-wired for UNO shields anyway.
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 Adafruit_GFX_Button left, right, finalB;
 
 int pixel_x, pixel_y;     //Touch_getXY() updates global vars
 int16_t block;
-uint16_t ID, x, y;       //Coordenadas barra
-uint16_t xB, yB;         //Coordenadas pelota
-uint16_t yButton;        //Cordenadas botones
-int8_t cX, cY;  //Avance pelota
+uint16_t ID, x, y;        //Coordenadas barra
+float xB, yB;             //Coordenadas pelota
+float cX, cY;             //Avance pelota
+uint16_t yButton;         //Cordenadas botones
 uint8_t Orientation = 0;
 int points;
 
@@ -59,8 +59,6 @@ void setup(void) {
 
   block = tft.width() / 6;
   tft.fillScreen(BLACK);
-
-  //Serial.begin(9600);
   
   randomSeed(analogRead(13));
   
@@ -116,11 +114,18 @@ void loop() {
     tft.drawCircle(xB, yB, 9, DarkGrey);
     if(xB >= 240 - 10 || xB <= 10)
       cX = -cX;
-    if(yB <= 10 || (yB == y - 10 && xB >= x && xB <= x + 80)) {
-      cY = cY >= 0 ? -1 : 1;
-      if(xB < x + 20 || xB > x + 60) {
+    if(yB <= 10) {
+      cY = -cY;
+    }
+    else if((int) yB == y - 10 && xB >= x && xB <= x + 80){
+      if(xB < x + 15 || xB > x + 65) {
         xB = (int) (xB / 2) * 2;
-        cX = cX >= 0 ? -2 : 2;
+        cX = xB < x + 40 ? -2 : 2;
+        cY = -0.5;
+      }
+      else {
+        cX = xB < x + 20 ? -abs(cX) : xB > x + 60 ? abs(cX) : cX;
+        cY = -1;
       }
     }
     if(yB >= 290) {
@@ -159,25 +164,19 @@ void loop() {
         cY = 1;
       }
     }
+    if(points == 60) {
+      lostGame = true;
+      playGame = false;
+      winner();
+      break;
+    }
   }
 }
 
 bool hitBrick(int x, int y) {
   if(bricks[y / 20][x / 20] == 1) {
-    /*Serial.print("(");
-    Serial.print(x / 20);
-    Serial.print(" ,");
-    Serial.print(y / 20);
-    Serial.print(")\t");
-    
-    Serial.print("(");
-    Serial.print(xB);
-    Serial.print(" ,");
-    Serial.print(yB);
-    Serial.println(")");*/
     bricks[y / 20][x / 20] = 0;
     tft.fillRect((int) (x / 20) * 20, (int) (y / 20) * 20, 20, 20, BLACK);
-    //Serial.println("true");
     points++;
     score();
     return true;
@@ -232,6 +231,22 @@ void gameOver() {
   tft.print("GAME");
   tft.setCursor(90, 170);
   tft.print("OVER");
+  
+  finalB.drawButton(false);
+  tft.setTextSize(2);
+  tft.setCursor(43, 243);
+  tft.print("Press to play");
+}
+
+void winner() {
+  tft.setCursor(25, 130);
+  tft.setTextSize(4);
+  tft.print("You Win!");
+  
+  tft.setTextSize(2);
+  tft.setCursor(20, 200);
+  tft.print("Final Score: ");
+  tft.print(points * 50);
   
   finalB.drawButton(false);
   tft.setTextSize(2);
