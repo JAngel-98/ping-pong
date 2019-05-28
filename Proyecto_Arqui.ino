@@ -11,7 +11,7 @@ const int TS_LEFT = 117, TS_RT = 897, TS_TOP = 76, TS_BOT = 886;
 
 MCUFRIEND_kbv tft;       // hard-wired for UNO shields anyway.
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
-Adafruit_GFX_Button left, right, finalb;
+Adafruit_GFX_Button left, right, finalB;
 
 int pixel_x, pixel_y;     //Touch_getXY() updates global vars
 int16_t block;
@@ -20,8 +20,9 @@ uint16_t xB, yB;         //Coordenadas pelota
 uint16_t yButton;        //Cordenadas botones
 int8_t cX, cY;  //Avance pelota
 uint8_t Orientation = 0;
+int points;
 
-int bricks[5][12];
+int bricks[16][12] = {0}; //Ladrillos
 
 int colors[] = {0x001f, 0xf800, 0x07e0, 0x780f, 0xffe0, 0xfd20};
 
@@ -55,21 +56,23 @@ void setup(void) {
   tft.begin(ID);
   tft.setRotation(Orientation);
   tft.fillScreen(BLACK);
-  
-  //Serial.begin(9600);
 
   block = tft.width() / 6;
   tft.fillScreen(BLACK);
+
+  //Serial.begin(9600);
   
   randomSeed(analogRead(13));
-  restartBricks();
   
+  restartBricks(); //Inicia juego
   startGame();
   
+  finalB.initButton(&tft, 120, 250, 170, 30, WHITE, BLACK, WHITE, " ", 1); //Inicia botones
   left.initButton(&tft,  20, yButton, 40, 20, WHITE, BLACK, WHITE, "Left", 1);
-  right.initButton(&tft, 240 - 20, yButton, 40, 20, WHITE, BLACK, WHITE, "Right", 1);
   left.drawButton(false);
+  right.initButton(&tft, 240 - 20, yButton, 40, 20, WHITE, BLACK, WHITE, "Right", 1);
   right.drawButton(false);
+  
 }
 
 void loop() {
@@ -78,15 +81,16 @@ void loop() {
     left.press(down && left.contains(pixel_x, pixel_y));
     right.press(down && right.contains(pixel_x, pixel_y));
     if(right.justPressed() || left.justPressed()) {
-      tft.fillRect(0, 100, 240, 150, BLACK);
+      tft.fillRect(40, 180, 160, 60, BLACK);
+      score();
       playGame = true;
-      
+      cX = right.justPressed() ? -1 : 1;
     }
   }
   if(!playGame && lostGame) {
     bool down = Touch_getXY();
-    finalb.press(down && finalb.contains(pixel_x, pixel_y));
-    if(finalb.justPressed()){
+    finalB.press(down && finalB.contains(pixel_x, pixel_y));
+    if(finalB.justPressed()){
       lostGame = false;
       restartGame();
     }
@@ -96,13 +100,13 @@ void loop() {
     left.press(down && left.contains(pixel_x, pixel_y));
     right.press(down && right.contains(pixel_x, pixel_y));
     if(right.justPressed() && x < tft.width() - block * 2) {
-      tft.fillRect(x, y, 8, 10, BLACK);
-      x += 4;
+      tft.fillRect(x, y, 10, 10, BLACK);
+      x += 8;
       tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
     }
     if(left.justPressed() && x > 0) {
-      tft.fillRect(x + block * 2 - 8, y, 8, 10, BLACK);
-      x -= 4;
+      tft.fillRect(x + block * 2 - 10, y, 10, 10, BLACK);
+      x -= 8;
       tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
     }
     tft.fillCircle(xB, yB, 9, BLACK);
@@ -110,35 +114,82 @@ void loop() {
     yB = yB + cY;
     tft.fillCircle(xB, yB, 9, WHITE);
     tft.drawCircle(xB, yB, 9, DarkGrey);
-    if(xB == 240 - 10 || xB == 10)
+    if(xB >= 240 - 10 || xB <= 10)
       cX = -cX;
-    if(yB == 10 || (yB == y - 10 && xB >= x && xB <= x + 80))
-      cY = -cY;
+    if(yB <= 10 || (yB == y - 10 && xB >= x && xB <= x + 80)) {
+      cY = cY >= 0 ? -1 : 1;
+      if(xB < x + 20 || xB > x + 60) {
+        xB = (int) (xB / 2) * 2;
+        cX = cX >= 0 ? -2 : 2;
+      }
+    }
     if(yB >= 290) {
       lostGame = true;
       playGame = false;
-      //randomSeed(analogRead(13));
       gameOver();
       break;
     }
-    if(yB < 111 && yB != 10) {
-      if((yB - 10) % 20 == 0) {
-        if(cY >= 0 && bricks[(int) ((yB + 10 - 20) / 20)][(int) (xB / 20)] == 1) {
-          bricks[(int) ((yB + 10 - 20) / 20)][(int) (xB / 20)] = 0;
-          tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20 - 20, 20, 20, BLACK);
-          cY = -cY;
-        }
-        if(cY < 0 && bricks[(int) ((yB - 10 - 20) / 20)][(int) (xB / 20)] == 1) {
-          bricks[(int) ((yB - 10 - 20) / 20)][(int) (xB / 20)] = 0;
-          tft.fillRect((int) (xB / 20) * 20, (int) (yB / 20) * 20 - 20, 20, 20, BLACK);
-          cY = -cY;
-        }
+    if(yB > 10) {
+      if(hitBrick(xB, yB - 10)) {
+        cY = -cY;
       }
-      if((xB - 10) % 20 == 0) {
-        //
+      if(hitBrick(xB + 10, yB)) {
+        cX = -cX;
+      }
+      if(hitBrick(xB, yB + 10)) {
+        cY = -cY;
+      }
+      if(hitBrick(xB - 10, yB)) {
+        cX = -cX;
+      }
+      if(hitBrick(xB + 9, yB - 9)) {
+        cX = -1;
+        cY = 1;
+      }
+      if(hitBrick(xB + 9, yB + 9)) {
+        cX = -1;
+        cY = -1;
+      }
+      if(hitBrick(xB - 9, yB + 9)) {
+        cX = 1;
+        cY = -1;
+      }
+      if(hitBrick(xB - 9, yB - 9)) {
+        cX = 1;
+        cY = 1;
       }
     }
   }
+}
+
+bool hitBrick(int x, int y) {
+  if(bricks[y / 20][x / 20] == 1) {
+    /*Serial.print("(");
+    Serial.print(x / 20);
+    Serial.print(" ,");
+    Serial.print(y / 20);
+    Serial.print(")\t");
+    
+    Serial.print("(");
+    Serial.print(xB);
+    Serial.print(" ,");
+    Serial.print(yB);
+    Serial.println(")");*/
+    bricks[y / 20][x / 20] = 0;
+    tft.fillRect((int) (x / 20) * 20, (int) (y / 20) * 20, 20, 20, BLACK);
+    //Serial.println("true");
+    points++;
+    score();
+    return true;
+  }
+  return false;
+}
+
+void score() {
+  tft.fillRect(60, 300, 120, 20, BLACK);
+  tft.setCursor(60, 305);
+  tft.print("Score: ");
+  tft.print(points * 50);
 }
 
 void restartBricks() {
@@ -152,28 +203,46 @@ void restartBricks() {
 }
 
 void startGame() {
-  cX = 1;
-  cY = -1; //Avance pelota
+  cY = -1; //Avance Y pelota
   
-  x = 80;
-  y = 280; //Barra
-  xB = x + 40;
-  yB = y - 10; //Pelota
+  x = 80; //Barra
+  y = 280;
+  xB = x + 40; //Pelota
+  yB = y - 10;
   yButton = 310; //Altura Botones
+
+  points = 0;
   
-  //Dibuja la barra
-  tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE);
-  //Rellena el interior de la pelota
-  tft.fillCircle(xB, yB, 9, WHITE);
-  //Dibuja el contorno de la pelota
-  tft.drawCircle(xB, yB, 9, DarkGrey);
-  //Pintar letras de inicio
-  tft.setTextSize(3);
-  tft.setCursor(43, 170);
+  tft.fillRoundRect(x, y, block * 2, 10, 1, WHITE); //Dibuja la barra
+  tft.fillCircle(xB, yB, 9, WHITE); //Rellena el interior de la pelota
+  tft.drawCircle(xB, yB, 9, DarkGrey); //Dibuja el contorno de la pelota
+  
+  tft.setTextSize(3); //Pintar letras de inicio
+  tft.setCursor(40, 180);
   tft.print("Press a");
-  tft.setCursor(43, 205);
+  tft.setCursor(40, 216);
   tft.print("button...");
   tft.setTextSize(1);
+  tft.fillRect(60, 300, 120, 20, BLACK);
+}
+
+void gameOver() {
+  tft.setCursor(20, 120);
+  tft.setTextSize(5);
+  tft.print("GAME");
+  tft.setCursor(90, 170);
+  tft.print("OVER");
+  
+  finalB.drawButton(false);
+  tft.setTextSize(2);
+  tft.setCursor(43, 243);
+  tft.print("Press to play");
+}
+
+void restartGame (){
+  tft.fillRect(0, 100, 240, 200, BLACK);
+  restartBricks();
+  startGame(); 
 }
 
 bool Touch_getXY(void) {
@@ -188,22 +257,4 @@ bool Touch_getXY(void) {
     pixel_y = map(p.y, TS_TOP, TS_BOT, 0, tft.height());
   }
   return pressed;
-}
-
-void gameOver() {
-  finalb.initButton(&tft, 120, 250, 170, 30, WHITE, BLACK, WHITE, " ", 1);
-  tft.setCursor(20, 120);
-  tft.setTextSize(5);
-  tft.print("GAME");
-  tft.setCursor(90, 170);
-  tft.print("OVER");
-  finalb.drawButton(false);
-  tft.setTextSize(2);
-  tft.setCursor(43, 243);
-  tft.print("Press to play");
-}
-void restartGame (){
-  tft.fillRect(0, 100, 240, 200, BLACK);
-  restartBricks();
-  startGame(); 
 }
